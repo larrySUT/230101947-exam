@@ -3,6 +3,7 @@
 @section('content')
 <div class="row">
     <div class="m-4 col-sm-6">
+        <p><strong>Account Credit:</strong> ${{ $user->credit }}</p>
         <table class="table table-striped">
             <tr>
                 <th>Name</th><td>{{$user->name}}</td>

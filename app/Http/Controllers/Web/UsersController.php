@@ -49,6 +49,42 @@ class UsersController extends Controller {
 	    $user->name = $request->name;
 	    $user->email = $request->email;
 	    $user->password = bcrypt($request->password); //Secure
+        $user->credit = 0;
+	    $user->save();
+
+        // Assign the "Customer" role
+        $user->assignRole('Customer');
+        return redirect('/');
+    }
+    
+    public function createEmployee(Request $request) {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Unauthorized action.');
+        }
+    
+        $this->validate($request, [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+    
+        $employee = new User();
+        $employee->name = $request->name;
+        $employee->email = $request->email;
+        $employee->password = bcrypt($request->password);
+        $employee->save();
+    
+        // Assign the "Employee" role
+        $employee->assignRole('Employee');
+    
+        return redirect()->route('users.list')->with('success', 'Employee created successfully.');
+    }
+
+    	
+    	$user =  new User();
+	    $user->name = $request->name;
+	    $user->email = $request->email;
+	    $user->password = bcrypt($request->password); //Secure
 	    $user->save();
 
         return redirect('/');

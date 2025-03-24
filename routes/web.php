@@ -45,3 +45,16 @@ Route::get('/prime', function () {
 Route::get('/test', function () {
     return view('test');
 });
+
+Route::middleware(['auth', 'role:Customer'])->group(function () {
+    Route::post('/products/{product}/purchase', [ProductsController::class, 'purchase'])->name('products.purchase');
+});
+
+Route::middleware(['auth', 'role:Employee'])->group(function () {
+    Route::post('/users/{user}/add-credit', [UsersController::class, 'addCredit'])->name('users.add_credit');
+}); 
+
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/profile/{user?}', [UsersController::class, 'profile'])->name('profile');
+});
