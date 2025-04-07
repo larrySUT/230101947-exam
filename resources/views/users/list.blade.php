@@ -2,8 +2,13 @@
 @section('title', 'Users')
 @section('content')
 <div class="row mt-2">
-    <div class="col col-10">
+    <div class="col col-8">
         <h1>Users</h1>
+    </div>
+    <div class="col col-4 text-end">
+        @can('admin_users')
+        <a href="{{ route('users_add') }}" class="btn btn-success">Create New User</a>
+        @endcan
     </div>
 </div>
 <form>
@@ -12,13 +17,17 @@
             <input name="keywords" type="text"  class="form-control" placeholder="Search Keywords" value="{{ request()->keywords }}" />
         </div>
         <div class="col col-sm-1">
-            <button type="submit" class="btn btn-primary">Submit</button>
         </div>
         <div class="col col-sm-1">
-            <button type="reset" class="btn btn-danger">Reset</button>
         </div>
     </div>
 </form>
+
+@if(session('success'))
+<div class="alert alert-success mt-2">
+    {{ session('success') }}
+</div>
+@endif
 
 <div class="card mt-2">
   <div class="card-body">
@@ -58,6 +67,5 @@
     </table>
   </div>
 </div>
-
 
 @endsection

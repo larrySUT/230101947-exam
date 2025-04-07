@@ -21,16 +21,16 @@ class ProductsController extends Controller {
 
 		$query = Product::select("products.*");
 
-		$query->when($request->keywords, 
+		$query->when($request->keywords,
 		fn($q)=> $q->where("name", "like", "%$request->keywords%"));
 
-		$query->when($request->min_price, 
+		$query->when($request->min_price,
 		fn($q)=> $q->where("price", ">=", $request->min_price));
-		
-		$query->when($request->max_price, fn($q)=> 
+
+		$query->when($request->max_price, fn($q)=>
 		$q->where("price", "<=", $request->max_price));
-		
-		$query->when($request->order_by, 
+
+		$query->when($request->order_by,
 		fn($q)=> $q->orderBy($request->order_by, $request->order_direction??"ASC"));
 
 		$products = $query->get();
@@ -38,65 +38,39 @@ class ProductsController extends Controller {
 		return view('products.list', compact('products'));
 	}
 
-	public function purchase(Request $request, Product $product) {
-		$user = auth()->user();
-	
-		// Ensure the user is logged in
-		if (!$user) {
-			return redirect('/login')->withErrors('You must be logged in to make a purchase.');
-		}
-	
-		// Check if the product is in stock
-		if ($product->stock <= 0) {
-			return redirect()->back()->withErrors('This product is out of stock.');
-		}
-	
-		// Check if the user has sufficient credit
-		if ($user->credit < $product->price) {
-			return redirect()->back()->withErrors('You do not have enough credit to purchase this product.');
-		}
-	
-		// Deduct the product price from the user's credit
-		$user->credit -= $product->price;
-		$user->save();
-	
-		// Reduce the product stock
-		$product->stock -= 1;
-		$product->save();
-	
-		// Record the purchase
-		$product->purcherses()->create([
-			'user_id' => $user->id,
-			'price' => $product->price,
-		]);
-	
-		return redirect()->route('products_list')->with('success', 'Purchase successful!');
-	}
-	public function edit(Request $request, Product $product = null) {
+	public function edit(Request $request, Product $product = null)
+    {
+        // Check for proper permissions
+        if(!auth()->user()->hasAnyPermission(['edit_products'])) {
+            abort(403, 'You do not have permission to edit products');
+        }
 
-		if(!auth()->user()) return redirect('/');
+        $product = $product??new Product();
+        return view('products.edit', compact('product'));
+    }
 
-		$product = $product??new Product();
+	public function save(Request $request, Product $product = null)
+    {
+        // Check for proper permissions
+        if(!auth()->user()->hasAnyPermission(['edit_products'])) {
+            abort(403, 'You do not have permission to save products');
+        }
 
-		return view('products.edit', compact('product'));
-	}
+        $this->validate($request, [
+            'code' => ['required', 'string', 'max:32'],
+            'name' => ['required', 'string', 'max:128'],
+            'model' => ['required', 'string', 'max:256'],
+            'description' => ['required', 'string', 'max:1024'],
+            'price' => ['required', 'numeric'],
+            'stock' => ['required', 'integer', 'min:0'],
+        ]);
 
-	public function save(Request $request, Product $product = null) {
+        $product = $product??new Product();
+        $product->fill($request->all());
+        $product->save();
 
-		$this->validate($request, [
-	        'code' => ['required', 'string', 'max:32'],
-	        'name' => ['required', 'string', 'max:128'],
-	        'model' => ['required', 'string', 'max:256'],
-	        'description' => ['required', 'string', 'max:1024'],
-	        'price' => ['required', 'numeric'],
-	    ]);
-
-		$product = $product??new Product();
-		$product->fill($request->all());
-		$product->save();
-
-		return redirect()->route('products_list');
-	}
+        return redirect()->route('products_list');
+    }
 
 	public function delete(Request $request, Product $product) {
 
@@ -106,4 +80,5 @@ class ProductsController extends Controller {
 
 		return redirect()->route('products_list');
 	}
-} 
+
+}

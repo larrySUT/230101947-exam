@@ -9,6 +9,8 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use DB;
 use Artisan;
+use Illuminate\Support\Facades\Hash;
+use App\Models\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -18,9 +20,9 @@ class UsersController extends Controller {
 	use ValidatesRequests;
 
     public function list(Request $request) {
-        if(!auth()->user()->hasPermissionTo('show_users'))abort(401);
+        if(!auth()->user()->hasPermissionTo('admin_users'))abort(401);
         $query = User::select('*');
-        $query->when($request->keywords, 
+        $query->when($request->keywords,
         fn($q)=> $q->where("name", "like", "%$request->keywords%"));
         $users = $query->get();
         return view('users.list', compact('users'));
@@ -36,7 +38,7 @@ class UsersController extends Controller {
     		$this->validate($request, [
 	        'name' => ['required', 'string', 'min:5'],
 	        'email' => ['required', 'email', 'unique:users'],
-	        'password' => ['required', 'confirmed', Password::min(8)->numbers()->letters()->mixedCase()->symbols()],
+	        'password' => ['required', 'confirmed'], // Password::min(8)->numbers()->letters()->mixedCase()->symbols()],
 	    	]);
     	}
     	catch(\Exception $e) {
@@ -44,50 +46,22 @@ class UsersController extends Controller {
     		return redirect()->back()->withInput($request->input())->withErrors('Invalid registration information.');
     	}
 
-    	
-    	$user =  new User();
-	    $user->name = $request->name;
-	    $user->email = $request->email;
-	    $user->password = bcrypt($request->password); //Secure
-        $user->credit = 0;
-	    $user->save();
-
-        // Assign the "Customer" role
-        $user->assignRole('Customer');
-        return redirect('/');
-    }
-    
-    public function createEmployee(Request $request) {
-        if (!auth()->user()->hasRole('Admin')) {
-            abort(403, 'Unauthorized action.');
-        }
-    
-        $this->validate($request, [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
         ]);
-    
-        $employee = new User();
-        $employee->name = $request->name;
-        $employee->email = $request->email;
-        $employee->password = bcrypt($request->password);
-        $employee->save();
-    
-        // Assign the "Employee" role
-        $employee->assignRole('Employee');
-    
-        return redirect()->route('users.list')->with('success', 'Employee created successfully.');
-    }
 
-    	
-    	$user =  new User();
-	    $user->name = $request->name;
-	    $user->email = $request->email;
-	    $user->password = bcrypt($request->password); //Secure
-	    $user->save();
+        // Assign Customer role
+        $user->assignRole('Customer');
 
-        return redirect('/');
+        // Create customer profile with zero credit
+        Customer::create([
+            'user_id' => $user->id,
+            'credit' => 0.00
+        ]);
+
+        return redirect(route('login'))->with('message', 'Registration successful! Please login.');
     }
 
     public function login(Request $request) {
@@ -95,7 +69,7 @@ class UsersController extends Controller {
     }
 
     public function doLogin(Request $request) {
-    	
+
     	if(!Auth::attempt(['email' => $request->email, 'password' => $request->password]))
             return redirect()->back()->withInput($request->input())->withErrors('Invalid login information.');
 
@@ -106,7 +80,7 @@ class UsersController extends Controller {
     }
 
     public function doLogout(Request $request) {
-    	
+
     	Auth::logout();
 
         return redirect('/');
@@ -116,7 +90,7 @@ class UsersController extends Controller {
 
         $user = $user??auth()->user();
         if(auth()->id()!=$user->id) {
-            if(!auth()->user()->hasPermissionTo('show_users')) abort(401);
+            if(!auth()->user()->hasPermissionTo('admin_users')) abort(401);
         }
 
         $permissions = [];
@@ -133,12 +107,12 @@ class UsersController extends Controller {
     }
 
     public function edit(Request $request, User $user = null) {
-   
+
         $user = $user??auth()->user();
         if(auth()->id()!=$user?->id) {
             if(!auth()->user()->hasPermissionTo('edit_users')) abort(401);
         }
-    
+
         $roles = [];
         foreach(Role::all() as $role) {
             $role->taken = ($user->hasRole($role->name));
@@ -150,7 +124,7 @@ class UsersController extends Controller {
         foreach(Permission::all() as $permission) {
             $permission->taken = in_array($permission->id, $directPermissionsIds);
             $permissions[] = $permission;
-        }      
+        }
 
         return view('users.edit', compact('user', 'roles', 'permissions'));
     }
@@ -158,7 +132,7 @@ class UsersController extends Controller {
     public function save(Request $request, User $user) {
 
         if(auth()->id()!=$user->id) {
-            if(!auth()->user()->hasPermissionTo('show_users')) abort(401);
+            if(!auth()->user()->hasPermissionTo('admin_users')) abort(401);
         }
 
         $user->name = $request->name;
@@ -200,13 +174,13 @@ class UsersController extends Controller {
     public function savePassword(Request $request, User $user) {
 
         if(auth()->id()==$user?->id) {
-            
+
             $this->validate($request, [
                 'password' => ['required', 'confirmed', Password::min(8)->numbers()->letters()->mixedCase()->symbols()],
             ]);
 
             if(!Auth::attempt(['email' => $user->email, 'password' => $request->old_password])) {
-                
+
                 Auth::logout();
                 return redirect('/');
             }
@@ -221,4 +195,52 @@ class UsersController extends Controller {
 
         return redirect(route('profile', ['user'=>$user->id]));
     }
-} 
+
+    public function add(Request $request)
+    {
+        // Only admin can access this
+        if (!auth()->user()->hasPermissionTo('admin_users')) abort(401);
+
+        $roles = Role::all();
+
+        return view('users.add', compact('roles'));
+    }
+
+    public function store(Request $request)
+    {
+        // Only admin can access this
+        if (!auth()->user()->hasPermissionTo('admin_users')) abort(401);
+
+        try {
+            $this->validate($request, [
+                'name' => ['required', 'string', 'min:5'],
+                'email' => ['required', 'email', 'unique:users'],
+                'password' => ['required', 'confirmed', Password::min(8)],
+                'roles' => ['required', 'array'],
+            ]);
+        } catch(\Exception $e) {
+            return redirect()->back()->withInput($request->input())->withErrors('Invalid user information.');
+        }
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        // Assign roles
+        $user->syncRoles($request->roles);
+
+        // If user has Customer role, create a customer record
+        if ($user->hasRole('Customer')) {
+            Customer::create([
+                'user_id' => $user->id,
+                'credit' => 0.00
+            ]);
+        }
+
+        Artisan::call('cache:clear');
+
+        return redirect()->route('users')->with('success', 'User created successfully!');
+    }
+}

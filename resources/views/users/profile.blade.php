@@ -3,7 +3,6 @@
 @section('content')
 <div class="row">
     <div class="m-4 col-sm-6">
-        <p><strong>Account Credit:</strong> ${{ $user->credit }}</p>
         <table class="table table-striped">
             <tr>
                 <th>Name</th><td>{{$user->name}}</td>
@@ -11,6 +10,12 @@
             <tr>
                 <th>Email</th><td>{{$user->email}}</td>
             </tr>
+            @if($user->hasRole('Customer'))
+            <tr>
+                <th>Credit Balance</th>
+                <td class="fw-bold">${{number_format($user->customer->credit, 2)}}</td>
+            </tr>
+            @endif
             <tr>
                 <th>Roles</th>
                 <td>
@@ -31,6 +36,9 @@
 
         <div class="row">
             <div class="col col-6">
+                @if($user->hasRole('Customer'))
+                <a href="{{route('purchases.index')}}" class="btn btn-primary">My Purchases</a>
+                @endif
             </div>
             @if(auth()->user()->hasPermissionTo('admin_users')||auth()->id()==$user->id)
             <div class="col col-4">
