@@ -15,6 +15,7 @@ class ProductsController extends Controller {
 	public function __construct()
     {
         $this->middleware('auth:web')->except('list');
+        /*123*/
     }
 
 	public function list(Request $request) {
@@ -38,40 +39,6 @@ class ProductsController extends Controller {
 		return view('products.list', compact('products'));
 	}
 
-	public function purchase(Request $request, Product $product) {
-		$user = auth()->user();
-	
-		// Ensure the user is logged in
-		if (!$user) {
-			return redirect('/login')->withErrors('You must be logged in to make a purchase.');
-		}
-	
-		// Check if the product is in stock
-		if ($product->stock <= 0) {
-			return redirect()->back()->withErrors('This product is out of stock.');
-		}
-	
-		// Check if the user has sufficient credit
-		if ($user->credit < $product->price) {
-			return redirect()->back()->withErrors('You do not have enough credit to purchase this product.');
-		}
-	
-		// Deduct the product price from the user's credit
-		$user->credit -= $product->price;
-		$user->save();
-	
-		// Reduce the product stock
-		$product->stock -= 1;
-		$product->save();
-	
-		// Record the purchase
-		$product->purcherses()->create([
-			'user_id' => $user->id,
-			'price' => $product->price,
-		]);
-	
-		return redirect()->route('products_list')->with('success', 'Purchase successful!');
-	}
 	public function edit(Request $request, Product $product = null) {
 
 		if(!auth()->user()) return redirect('/');

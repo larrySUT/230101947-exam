@@ -16,6 +16,16 @@
             <li class="nav-item">
                 <a class="nav-link" href="{{route('products_list')}}">Products</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{route('courses_list')}}">Courses</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{route('grades_list')}}">Grades</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{route('cryptography')}}">Cryptography</a>
+            </li>
+
             @can('show_users')
             <li class="nav-item">
                 <a class="nav-link" href="{{route('users')}}">Users</a>

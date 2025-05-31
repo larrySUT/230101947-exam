@@ -1,5 +1,5 @@
 @extends('layouts.master')
-@section('title', 'Muliplication Table')
+@section('title', 'Prime Numbers')
 @section('content')
 <div class="card m-4 col-sm-3">	
   <div class="card-header">Multiplication Table of {{$j}}</div>

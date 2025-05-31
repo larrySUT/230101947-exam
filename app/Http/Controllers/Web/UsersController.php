@@ -7,9 +7,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
+use Laravel\Socialite\Facades\Socialite;
 use DB;
 use Artisan;
+use Carbon\Carbon;
 
+
+use App\Mail\VerificationEmail;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 
@@ -49,45 +55,21 @@ class UsersController extends Controller {
 	    $user->name = $request->name;
 	    $user->email = $request->email;
 	    $user->password = bcrypt($request->password); //Secure
-        $user->credit = 0;
 	    $user->save();
 
-        // Assign the "Customer" role
-        $user->assignRole('Customer');
-        return redirect('/');
-    }
-    
-    public function createEmployee(Request $request) {
-        if (!auth()->user()->hasRole('Admin')) {
-            abort(403, 'Unauthorized action.');
-        }
-    
-        $this->validate($request, [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-    
-        $employee = new User();
-        $employee->name = $request->name;
-        $employee->email = $request->email;
-        $employee->password = bcrypt($request->password);
-        $employee->save();
-    
-        // Assign the "Employee" role
-        $employee->assignRole('Employee');
-    
-        return redirect()->route('users.list')->with('success', 'Employee created successfully.');
-    }
+        // Assign customer role to new user
+        $customerRole = Role::firstOrCreate(['name' => 'customer']);
+        $user->assignRole($customerRole);
 
-    	
-    	$user =  new User();
-	    $user->name = $request->name;
-	    $user->email = $request->email;
-	    $user->password = bcrypt($request->password); //Secure
-	    $user->save();
+        /*
+        $title = "Verification Link";
+        $token = Crypt::encryptString(json_encode(['id' => $user->id, 'email' => $user->email]));
+        $link = route("verify", ['token' => $token]);
+        Mail::to($user->email)->send(new VerificationEmail($link, $user->name));
+        */
 
         return redirect('/');
+
     }
 
     public function login(Request $request) {
@@ -101,6 +83,11 @@ class UsersController extends Controller {
 
         $user = User::where('email', $request->email)->first();
         Auth::setUser($user);
+
+        /*
+        if(!$user->email_verified_at)
+            return redirect()->back()->withInput($request->input())->withErrors('Your email is not verified.');
+        */
 
         return redirect('/');
     }
@@ -221,4 +208,39 @@ class UsersController extends Controller {
 
         return redirect(route('profile', ['user'=>$user->id]));
     }
+
+    public function verify(Request $request) {
+   
+        $decryptedData = json_decode(Crypt::decryptString($request->token), true);
+        $user = User::find($decryptedData['id']);
+        if(!$user) abort(401);
+        $user->email_verified_at = Carbon::now();
+        $user->save();
+
+        return view('users.verified', compact('user'));
+    }
+
+    public function redirectToGoogle()
+    {
+        return Socialite::driver('google')->redirect();
+    }
+
+    public function handleGoogleCallback() {
+        try {
+            $googleUser = Socialite::driver('google')->user();
+            $user = User::updateOrCreate([
+                'google_id' => $googleUser->id,
+            ], [
+                'name' => $googleUser->name,
+                'email' => $googleUser->email,
+                'google_token' => $googleUser->token,
+                'google_refresh_token' => $googleUser->refreshToken,
+            ]);
+            Auth::login($user);
+            return redirect('/');
+        } catch (\Exception $e) {
+            return redirect('/login')->with('error', 'Google login failed.'); // Handle errors
+        }
+    }
+
 } 
